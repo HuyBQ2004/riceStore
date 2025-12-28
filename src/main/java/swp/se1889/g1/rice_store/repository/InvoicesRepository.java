@@ -110,4 +110,16 @@ public interface InvoicesRepository extends JpaRepository<Invoices, Long>, JpaSp
             "WHERE i.store_id = :storeId " +
             "ORDER BY i.created_at DESC", nativeQuery = true)
     List<Object[]> findTop5000ByStoreNative(@Param("storeId") Long storeId);
+
+    // [NEW] 3.3 JPQL Optimized (Dùng JOIN FETCH để khử N+1)
+    // Lưu ý: Vì Invoice có quan hệ với Store, Customer, và User (createdBy),
+    // ta cần JOIN FETCH hết các quan hệ EAGER này.
+    @Query("SELECT i FROM Invoices i " +
+            "JOIN FETCH i.store " +
+            "JOIN FETCH i.customer " +
+            "JOIN FETCH i.createdBy " +
+            "WHERE i.store.id = :storeId " +
+            "ORDER BY i.createdAt DESC " +
+            "LIMIT 5000")
+    List<Invoices> findTop5000ByStoreJPQLOptimized(@Param("storeId") Long storeId);
 }

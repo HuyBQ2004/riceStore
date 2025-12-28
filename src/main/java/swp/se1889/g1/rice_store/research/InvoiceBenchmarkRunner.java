@@ -62,9 +62,12 @@ public class InvoiceBenchmarkRunner implements CommandLineRunner {
                 invoiceRepo.getRevenueByMonthJPQL(rStoreId, TARGET_YEAR);
 
                 // Top 5000 (chạy ít hơn lúc warmup vì nặng)
+                // ... bên trong vòng lặp warm-up
+                // Top 5000 (chạy ít hơn lúc warmup vì nặng)
                 if (i % 10 == 0) {
                     invoiceRepo.findTop5000ByStoreNative(rStoreId);
                     invoiceRepo.findTop5000ByStoreJPQL(rStoreId);
+                    invoiceRepo.findTop5000ByStoreJPQLOptimized(rStoreId); // <--- THÊM DÒNG NÀY
                 }
             }
 
@@ -177,6 +180,28 @@ public class InvoiceBenchmarkRunner implements CommandLineRunner {
                 long prepareCount = stats != null ? stats.getPrepareStatementCount() : -1;
 
                 logData(pw, i, "S3_LargeFetch", "JPQL", duration, queryCount, prepareCount);
+            }
+            // ... (Sau khi kết thúc Phase 7 JPQL)
+
+            System.out.println("[Phase 8] Measuring S3: Large Fetch (JPQL Optimized)...");
+            cleanMemory();
+            for (int i = 0; i < MEASURE_CYCLES; i++) {
+                Long storeId = getRandomStoreId();
+                Statistics stats = getStatistics();
+                if (stats != null) stats.clear();
+
+                long start = System.nanoTime();
+
+                // Gọi hàm tối ưu
+                invoiceRepo.findTop5000ByStoreJPQLOptimized(storeId);
+
+                long duration = System.nanoTime() - start;
+
+                long queryCount = stats != null ? stats.getQueryExecutionCount() : -1;
+                long prepareCount = stats != null ? stats.getPrepareStatementCount() : -1;
+
+                // Lưu log với type là "JPQL_Opt" hoặc "JPQL_Fetch"
+                logData(pw, i, "S3_LargeFetch", "JPQL_Optimized", duration, queryCount, prepareCount);
             }
 
             System.out.println(">>> INVOICE BENCHMARK COMPLETE <<<");
