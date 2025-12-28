@@ -16,6 +16,7 @@ import swp.se1889.g1.rice_store.entity.User;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface InvoicesRepository extends JpaRepository<Invoices, Long>, JpaSpecificationExecutor<Invoices> {
@@ -50,4 +51,63 @@ public interface InvoicesRepository extends JpaRepository<Invoices, Long>, JpaSp
     // --- D. Doanh thu theo các tháng trong năm hiện tại ---
     @Query(value = "SELECT MONTH(i.created_at) AS month, SUM(i.final_amount) AS revenue FROM invoices i WHERE i.store_id = :storeId AND i.type = 'Sale' AND i.is_deleted = 0 AND YEAR(i.created_at) = :year GROUP BY MONTH(i.created_at) ORDER BY month", nativeQuery = true)
     List<Object[]> getRevenueByMonth(@Param("storeId") Long storeId, @Param("year") int year);
+    // =================================================================================
+    // SCENARIO 1: SIMPLE READ (Đọc đơn giản 1 bản ghi)
+    // Mục tiêu: Đo overhead của Hibernate khi mapping 1 dòng dữ liệu đơn lẻ.
+    // =================================================================================
+
+    // 1.1 JPQL Approach
+    @Query("SELECT i FROM Invoices i WHERE i.id = :id")
+    Optional<Invoices> findByIdJPQL(@Param("id") Long id);
+
+    // 1.2 Native SQL Approach
+    @Query(value = "SELECT * FROM invoices WHERE id = :id", nativeQuery = true)
+    Optional<Invoices> findByIdNative(@Param("id") Long id);
+
+
+    // =================================================================================
+    // SCENARIO 2: COMPLEX AGGREGATION (Tính toán báo cáo doanh thu theo tháng)
+    // Mục tiêu: Chứng minh sức mạnh của Native SQL khi xử lý Group By và Date Function.
+    // Logic: Tính tổng doanh thu theo từng tháng trong năm cụ thể của 1 cửa hàng.
+    // =================================================================================
+
+    // 2.1 JPQL Approach (Hibernate 6 hỗ trợ hàm MONTH/YEAR trong HQL)
+    @Query("SELECT MONTH(i.createdAt) as month, SUM(i.finalAmount) as revenue " +
+            "FROM Invoices i " +
+            "WHERE i.store.id = :storeId " +
+            "AND i.type = 'Sale' " +
+            "AND i.isDeleted = false " +
+            "AND YEAR(i.createdAt) = :year " +
+            "GROUP BY MONTH(i.createdAt) " +
+            "ORDER BY month")
+    List<Object[]> getRevenueByMonthJPQL(@Param("storeId") Long storeId, @Param("year") int year);
+
+    // 2.2 Native SQL Approach (Tối ưu hóa cho SQL Server)
+    @Query(value = "SELECT MONTH(i.created_at) AS month, SUM(i.final_amount) AS revenue " +
+            "FROM invoices i " +
+            "WHERE i.store_id = :storeId " +
+            "AND i.type = 'Sale' " +
+            "AND i.is_deleted = 0 " +
+            "AND YEAR(i.created_at) = :year " +
+            "GROUP BY MONTH(i.created_at) " +
+            "ORDER BY month", nativeQuery = true)
+    List<Object[]> getRevenueByMonthNative(@Param("storeId") Long storeId, @Param("year") int year);
+
+
+    // =================================================================================
+    // SCENARIO 3: N+1 PROBLEM SIMULATION (Liệt kê danh sách lớn)
+    // Mục tiêu: Đo lượng RAM (Memory Footprint) và CPU.
+    // Logic: Lấy 5000 hóa đơn mới nhất của cửa hàng để hiển thị lên bảng.
+    // =================================================================================
+
+    // 3.1 JPQL Approach (Dễ dính N+1 nếu truy cập vào i.customer hoặc i.store sau đó)
+    @Query("SELECT i FROM Invoices i WHERE i.store.id = :storeId ORDER BY i.createdAt DESC LIMIT 5000")
+    List<Invoices> findTop5000ByStoreJPQL(@Param("storeId") Long storeId);
+
+    // 3.2 Native SQL Approach (Chỉ lấy dữ liệu cột cần thiết - Projection, nhẹ hơn nhiều)
+    @Query(value = "SELECT top 5000 i.id, i.final_amount, i.created_at, i.payment_status " +
+            "FROM invoices i " +
+            "WHERE i.store_id = :storeId " +
+            "ORDER BY i.created_at DESC", nativeQuery = true)
+    List<Object[]> findTop5000ByStoreNative(@Param("storeId") Long storeId);
 }

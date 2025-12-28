@@ -44,10 +44,10 @@ public class User {
     private LocalDateTime updatedAt;
 
     @Column(name = "created_by")
-    private long createdBy;
+    private Long createdBy;
 
     @Column(name = "updated_by")
-    private long updatedBy;
+    private Long updatedBy;
 
     @Column(name = "is_deleted")
     private boolean isDeleted;

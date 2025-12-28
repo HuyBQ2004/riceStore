@@ -20,11 +20,14 @@ public class Invoices {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
     @ManyToOne
-    @JoinColumn(name = "store_id", nullable = false) // Thay thế @Column bằng @JoinColumn
+    @JoinColumn(name = "store_id", nullable = false)
     private Store store;
     @ManyToOne
-    @JoinColumn(name = "customer_id", nullable = false) // Thay thế @Column bằng @JoinColumn
+    @JoinColumn(name = "customer_id", nullable = false)
     private Customer customer;
+    @ManyToOne
+    @JoinColumn(name = "created_by", nullable = false)
+    private User createdBy;
     @Column(name = "total_price", nullable = false)
     private BigDecimal totalPrice;
     @Column(name = "discount", nullable = false)
@@ -37,9 +40,6 @@ public class Invoices {
     private LocalDateTime createdAt = LocalDateTime.now();
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt = LocalDateTime.now();
-    @ManyToOne
-    @JoinColumn(name = "created_by", nullable = false)
-    private User createdBy;
     @Column(name = "updated_by", nullable = false)
     private String updatedBy;
     @Column(name = "is_deleted", nullable = false)
