@@ -3,6 +3,7 @@ package swp.se1889.g1.rice_store.research;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Profile;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
 import swp.se1889.g1.rice_store.repository.InvoicesRepository;
 import jakarta.persistence.EntityManagerFactory;
@@ -66,8 +67,8 @@ public class InvoiceBenchmarkRunner implements CommandLineRunner {
                 // Top 5000 (chạy ít hơn lúc warmup vì nặng)
                 if (i % 10 == 0) {
                     invoiceRepo.findTop5000ByStoreNative(rStoreId);
-                    invoiceRepo.findTop5000ByStoreJPQL(rStoreId);
-                    invoiceRepo.findTop5000ByStoreJPQLOptimized(rStoreId); // <--- THÊM DÒNG NÀY
+                    invoiceRepo.findTop5000ByStoreJPQL(rStoreId, PageRequest.of(0, 5000));
+                    invoiceRepo.findTop5000ByStoreJPQLOptimized(rStoreId, PageRequest.of(0, 5000)); // <--- THÊM DÒNG NÀY
                 }
             }
 
@@ -173,7 +174,7 @@ public class InvoiceBenchmarkRunner implements CommandLineRunner {
                 if (stats != null) stats.clear();
 
                 long start = System.nanoTime();
-                invoiceRepo.findTop5000ByStoreJPQL(storeId);
+                invoiceRepo.findTop5000ByStoreJPQL(storeId, PageRequest.of(0, 5000));
                 long duration = System.nanoTime() - start;
 
                 long queryCount = stats != null ? stats.getQueryExecutionCount() : -1;
@@ -193,7 +194,7 @@ public class InvoiceBenchmarkRunner implements CommandLineRunner {
                 long start = System.nanoTime();
 
                 // Gọi hàm tối ưu
-                invoiceRepo.findTop5000ByStoreJPQLOptimized(storeId);
+                invoiceRepo.findTop5000ByStoreJPQLOptimized(storeId, PageRequest.of(0, 5000));
 
                 long duration = System.nanoTime() - start;
 

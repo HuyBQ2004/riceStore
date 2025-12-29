@@ -92,7 +92,7 @@ public interface DebtRecordRepository extends JpaRepository<DebtRecords, Long>, 
             FROM DebtRecords d 
             WHERE d.customerId = :customerId 
             ORDER BY d.createOn DESC 
-            LIMIT 5000
+            
             """)
-    List<DebtRecords> getHistoryJPQL(@Param("customerId") Long customerId);
+    List<DebtRecords> getHistoryJPQL(@Param("customerId") Long customerId, Pageable pageable);
 }

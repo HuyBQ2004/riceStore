@@ -6,6 +6,7 @@ import org.hibernate.stat.Statistics;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Profile;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
 import swp.se1889.g1.rice_store.repository.DebtRecordRepository;
 
@@ -57,7 +58,7 @@ public class DebtBenchmarkRunner implements CommandLineRunner {
                 debtRepo.getMonthlyDebtNative(randomCustomerId);
                 debtRepo.getMonthlyDebtJPQL(randomCustomerId);
                 debtRepo.getHistoryNative(randomCustomerId);
-                debtRepo.getHistoryJPQL(randomCustomerId);
+                debtRepo.getHistoryJPQL(randomCustomerId, PageRequest.of(0, 5000));
                 debtRepo.findById(randomDebtId);
                 debtRepo.findByIdNative(randomDebtId);
             }
@@ -181,7 +182,7 @@ public class DebtBenchmarkRunner implements CommandLineRunner {
                 if (statistics != null) statistics.clear();
 
                 long start = System.nanoTime();
-                debtRepo.getHistoryJPQL(randomId);
+                debtRepo.getHistoryJPQL(randomId, PageRequest.of(0, 5000));
                 long duration = System.nanoTime() - start;
 
                 long queryCount = statistics != null ? statistics.getQueryExecutionCount() : -1;

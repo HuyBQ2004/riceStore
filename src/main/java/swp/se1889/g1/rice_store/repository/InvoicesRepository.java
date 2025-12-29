@@ -101,8 +101,8 @@ public interface InvoicesRepository extends JpaRepository<Invoices, Long>, JpaSp
     // =================================================================================
 
     // 3.1 JPQL Approach (Dễ dính N+1 nếu truy cập vào i.customer hoặc i.store sau đó)
-    @Query("SELECT i FROM Invoices i WHERE i.store.id = :storeId ORDER BY i.createdAt DESC LIMIT 5000")
-    List<Invoices> findTop5000ByStoreJPQL(@Param("storeId") Long storeId);
+    @Query("SELECT i FROM Invoices i WHERE i.store.id = :storeId ORDER BY i.createdAt DESC ")
+    List<Invoices> findTop5000ByStoreJPQL(@Param("storeId") Long storeId, Pageable pageable);
 
     // 3.2 Native SQL Approach (Chỉ lấy dữ liệu cột cần thiết - Projection, nhẹ hơn nhiều)
     @Query(value = "SELECT top 5000 i.id, i.final_amount, i.created_at, i.payment_status " +
@@ -119,7 +119,7 @@ public interface InvoicesRepository extends JpaRepository<Invoices, Long>, JpaSp
             "JOIN FETCH i.customer " +
             "JOIN FETCH i.createdBy " +
             "WHERE i.store.id = :storeId " +
-            "ORDER BY i.createdAt DESC " +
-            "LIMIT 5000")
-    List<Invoices> findTop5000ByStoreJPQLOptimized(@Param("storeId") Long storeId);
+            "ORDER BY i.createdAt DESC "
+    )
+    List<Invoices> findTop5000ByStoreJPQLOptimized(@Param("storeId") Long storeId, Pageable pageable);
 }
