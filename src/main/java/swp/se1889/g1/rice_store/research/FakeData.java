@@ -13,7 +13,17 @@ package swp.se1889.g1.rice_store.research;
  - Seed is fixed for reproducibility.
  - Adjust DB_URL, DB_USER, DB_PASSWORD before running.
  - Batch inserts used for performance.
+ /*
+ Dataset configuration:
+ - Users: 100
+ - Stores: 50
+ - Customers: 50,000
+ - Products: 2,000
+ - Invoices: 1,000,000
+ - Time span: 12 months
+ - Random seed: 12345
 */
+
 
 import java.sql.*;
 import java.time.temporal.ChronoUnit;
