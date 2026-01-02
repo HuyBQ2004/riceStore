@@ -103,7 +103,7 @@ public class FakeData {
 
     // 1. users (id, username, password, email, role, name, address, phone, note, timestamps)
     private static Map<Integer, String> createUsers(Connection conn) throws SQLException {
-        String sql = "INSERT INTO users (username, password, email, role, name, address, phone, note, created_at, updated_at, is_deleted) VALUES (?,?,?,?,?,?,?,?,GETDATE(),GETDATE(),?)";
+        String sql = "INSERT INTO users (username, password, email, role, name, address, phone, note , created_at, updated_at,created_by,updated_by, is_deleted) VALUES (?,?,?,?,?,?,?,?,GETDATE(),GETDATE(),?,?,?)";
         Map<Integer, String> idToUsername = new HashMap<>();
         try (PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
             int count = 0;
@@ -118,7 +118,9 @@ public class FakeData {
                 ps.setString(6, randomAddress(i));
                 ps.setString(7, randomPhone(i));
                 ps.setString(8, NOTES[rnd.nextInt(NOTES.length)]);
-                ps.setBoolean(9, false);
+                ps.setInt(9, 1);
+                ps.setInt(10, 1);
+                ps.setBoolean(11, false);
                 ps.addBatch();
                 count++;
                 if (count % BATCH_SIZE == 0) {

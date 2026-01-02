@@ -204,6 +204,42 @@ public class InvoiceBenchmarkRunner implements CommandLineRunner {
                 // Lưu log với type là "JPQL_Opt" hoặc "JPQL_Fetch"
                 logData(pw, i, "S3_LargeFetch", "JPQL_Optimized", duration, queryCount, prepareCount);
             }
+            System.out.println("[Phase 9] Measuring S4: DTO (JPQL DTO)...");
+            cleanMemory();
+            for (int i = 0; i < MEASURE_CYCLES; i++) {
+                Long storeId = getRandomStoreId();
+                Statistics stats = getStatistics();
+                if (stats != null) stats.clear();
+
+                long start = System.nanoTime();
+
+                // Gọi hàm tối ưu
+                invoiceRepo.findTop5000JPQLDTO(storeId, PageRequest.of(0, 5000));
+
+                long duration = System.nanoTime() - start;
+
+                long queryCount = stats != null ? stats.getQueryExecutionCount() : -1;
+                long prepareCount = stats != null ? stats.getPrepareStatementCount() : -1;
+
+                // Lưu log với type là "JPQL_Opt" hoặc "JPQL_Fetch"
+                logData(pw, i, "S4_DTO", "JPQL_DTO", duration, queryCount, prepareCount);
+            }
+            System.out.println("[Phase 10] Measuring S4: DTO (Native)...");
+            cleanMemory();
+            for (int i = 0; i < MEASURE_CYCLES; i++) {
+                Long storeId = getRandomStoreId();
+                Statistics stats = getStatistics();
+                if (stats != null) stats.clear();
+
+                long start = System.nanoTime();
+                invoiceRepo.findTop5000NativeDTO(storeId);
+                long duration = System.nanoTime() - start;
+
+                long queryCount = stats != null ? stats.getQueryExecutionCount() : -1;
+                long prepareCount = stats != null ? stats.getPrepareStatementCount() : -1;
+
+                logData(pw, i, "S4_DTO", "Native", duration, queryCount, prepareCount);
+            }
 
             System.out.println(">>> INVOICE BENCHMARK COMPLETE <<<");
 
@@ -226,9 +262,9 @@ public class InvoiceBenchmarkRunner implements CommandLineRunner {
     }
 
     private void cleanMemory() {
-        System.gc();
+
         try {
-            Thread.sleep(500);
+            Thread.sleep(1000);
         } catch (InterruptedException e) {
         }
     }

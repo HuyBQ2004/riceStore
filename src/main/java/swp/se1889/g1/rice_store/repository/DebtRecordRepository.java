@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import swp.se1889.g1.rice_store.entity.DebtRecords;
 import swp.se1889.g1.rice_store.entity.User;
+import swp.se1889.g1.rice_store.dto.DebtRecordDTO;
 
 import java.util.List;
 import java.util.Optional;
@@ -21,12 +22,11 @@ public interface DebtRecordRepository extends JpaRepository<DebtRecords, Long>, 
     Page<DebtRecords> findByCustomerId(Long customerId, Pageable pageable);
 
     // =================================================================================
-    // SCENARIO 1: SIMPLE READ (Đọc 1 dòng theo ID)
-    // Mục tiêu: Đo overhead khởi tạo của Hibernate với 1 Entity đơn lẻ.
+    // SCENARIO 1: SIMPLE READ
     // =================================================================================
 
-    // 1.1 JPQL/JPA Standard (Có sẵn findById trong JpaRepository)
-    // Hibernate sẽ dùng Cache L1 nếu có.
+    // 1.1 JPQL/JPA Standard
+
     Optional<DebtRecords> findById(Long id);
 
     // 1.2 Native SQL Approach
@@ -34,13 +34,13 @@ public interface DebtRecordRepository extends JpaRepository<DebtRecords, Long>, 
     @Query(value = "SELECT * FROM debt_records WHERE id = :id", nativeQuery = true)
     Optional<DebtRecords> findByIdNative(@Param("id") Long id);
 // =================================================================================
-    // SCENARIO 2: COMPLEX AGGREGATION (Báo cáo công nợ theo thời gian)
-    // Mục tiêu: So sánh hiệu năng Group By và Hàm thời gian (YEAR/MONTH)
-    // Logic: Thống kê tổng nợ của khách hàng theo từng tháng.
+    // SCENARIO 2: COMPLEX AGGREGATION
+
     // =================================================================================
 
-    // 1. Native SQL Approach (Đã tối ưu)
-    // Ưu điểm: SQL Server thực hiện gom nhóm và trả về kết quả thô cực nhanh.
+    // Native SQL Approach
+    // Database performs aggregation before results are returned to the application.
+
     @Query(value = """
             SELECT 
                 YEAR(d.create_on) AS year,
@@ -54,8 +54,9 @@ public interface DebtRecordRepository extends JpaRepository<DebtRecords, Long>, 
             """, nativeQuery = true)
     List<Object[]> getMonthlyDebtNative(@Param("customerId") Long customerId);
 
-    // 2. JPQL Approach (Đối thủ so sánh)
-    // Nhược điểm: Hibernate phải parse hàm YEAR/MONTH của HQL sang SQL dialect tương ứng.
+    // JPQL Approach
+    // Aggregation is expressed using HQL temporal functions.
+
     @Query("""
             SELECT 
                 YEAR(d.createOn) as year, 
@@ -71,22 +72,20 @@ public interface DebtRecordRepository extends JpaRepository<DebtRecords, Long>, 
 
 
     // =================================================================================
-    // SCENARIO 3: LARGE DATA FETCH (Lấy lịch sử nợ dài)
-    // Mục tiêu: Đo Memory footprint (RAM) khi load danh sách lớn.
-    // Logic: Lấy 5000 giao dịch nợ gần nhất của 1 khách hàng VIP.
+    // SCENARIO 3: LARGE DATA FETCH
     // =================================================================================
 
-    // 3. Native SQL (Projection - Chỉ lấy field cần thiết)
+    // 3. Native SQL Entity
     @Query(value = """
-            SELECT TOP 5000 id, amount, note, create_on 
+            SELECT  TOP 5000 *
             FROM debt_records 
             WHERE customer_id = :customerId 
             ORDER BY create_on DESC
             """, nativeQuery = true)
-    List<Object[]> getHistoryNative(@Param("customerId") Long customerId);
+    List<DebtRecords> getHistoryNative(@Param("customerId") Long customerId);
 
-    // 4. JPQL (Entity Loading - Load nguyên object)
-    // Rủi ro: Tốn RAM để quản lý State của 5000 object DebtRecords.
+    // 4. JPQL (Entity Loading )
+
     @Query("""
             SELECT d 
             FROM DebtRecords d 
@@ -95,4 +94,26 @@ public interface DebtRecordRepository extends JpaRepository<DebtRecords, Long>, 
             
             """)
     List<DebtRecords> getHistoryJPQL(@Param("customerId") Long customerId, Pageable pageable);
+    // =================================================================================
+// [NEW] SCENARIO 4: DTO PROJECTION
+// =================================================================================
+
+    // 4.1 JPQL  DTO
+    @Query("""
+            SELECT d.id as id, d.amount as amount, d.createOn as createOn 
+            FROM DebtRecords d 
+            WHERE d.customerId = :customerId 
+            ORDER BY d.createOn DESC
+            """)
+    List<DebtRecordDTO> getHistoryJPQLDTO(@Param("customerId") Long customerId, Pageable pageable);
+
+    // 4.2 Native SQL  DTO
+    @Query(value = """
+            SELECT TOP 5000 id, amount, create_on as createOn 
+            FROM debt_records 
+            WHERE customer_id = :customerId 
+            ORDER BY create_on DESC
+            """, nativeQuery = true)
+    List<DebtRecordDTO> getHistoryNativeDTO(@Param("customerId") Long customerId);
+
 }

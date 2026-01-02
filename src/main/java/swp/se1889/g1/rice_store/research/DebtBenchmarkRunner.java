@@ -22,15 +22,15 @@ public class DebtBenchmarkRunner implements CommandLineRunner {
     @Autowired
     private DebtRecordRepository debtRepo;
     @Autowired
-    private EntityManagerFactory entityManagerFactory; // Dùng để lấy thống kê
+    private EntityManagerFactory entityManagerFactory;
 
-    // CẤU HÌNH THÍ NGHIỆM (EXPERIMENTAL CONFIGURATION)
+
     // -----------------------------------------------------------
-    private static final int WARMUP_CYCLES = 100;      // Số lần chạy nháp để JVM tối ưu (JIT)
-    private static final int MEASURE_CYCLES = 1000;    // Số mẫu (Sample size) cho mỗi kịch bản -> Tổng 4000 mẫu
+    private static final int WARMUP_CYCLES = 100;
+    private static final int MEASURE_CYCLES = 1000;
     private static final String CSV_FILE = "research_data_debt_full.csv";
-    private static final int MAX_CUSTOMER_ID = 1000;   // Giả định ID khách hàng từ 1-1000 có dữ liệu dày
-    private static final long MAX_DEBT_ID = 500000L; // Giả sử có 500k bản ghi
+    private static final int MAX_CUSTOMER_ID = 1000;
+    private static final long MAX_DEBT_ID = 500000L;
     // -----------------------------------------------------------
 
     private final Random random = new Random();
@@ -43,31 +43,32 @@ public class DebtBenchmarkRunner implements CommandLineRunner {
         try (FileWriter fw = new FileWriter(CSV_FILE);
              PrintWriter pw = new PrintWriter(fw)) {
 
-            // HEADER CSV: Quan trọng để Import vào Excel/Python
+            // HEADER CSV
             pw.println("iteration,scenario,type,duration_ns,duration_ms,sql_queries,prepared_statements");
 
             // =========================================================================
-            // PHASE 1: WARM-UP (LÀM NÓNG ĐỘNG CƠ JVM & DB CACHE)
-            // Mục tiêu: Loại bỏ độ trễ của lần chạy đầu tiên (Cold Start Latency)
+            // PHASE 1: WARM-UP
+
             // =========================================================================
             System.out.println("[Phase Warmup] Warming up system (Ignoring results)...");
             for (int i = 0; i < WARMUP_CYCLES; i++) {
                 Long randomCustomerId = getRandomCustomerId();
                 Long randomDebtId = getRandomDebtId();
-                // Gọi tất cả các hàm để Classloader load class và JIT biên dịch
                 debtRepo.getMonthlyDebtNative(randomCustomerId);
                 debtRepo.getMonthlyDebtJPQL(randomCustomerId);
                 debtRepo.getHistoryNative(randomCustomerId);
                 debtRepo.getHistoryJPQL(randomCustomerId, PageRequest.of(0, 5000));
                 debtRepo.findById(randomDebtId);
                 debtRepo.findByIdNative(randomDebtId);
+                debtRepo.getHistoryNativeDTO(randomCustomerId);
+                debtRepo.getHistoryJPQLDTO(randomCustomerId, PageRequest.of(0, 5000));
             }
 
             // =========================================================================
             // PHASE S1: SIMPLE READ (JPQL vs NATIVE)
             // ========================================================================
             System.out.println("[Phase S1/5] Measuring Scenario 1 (Simple Read) - NATIVE vs JPQL...");
-            cleanMemory(); // Reset RAM để công bằng
+            cleanMemory();
 
             // S1 - NATIVE
             for (int i = 0; i < MEASURE_CYCLES; i++) {
@@ -190,6 +191,41 @@ public class DebtBenchmarkRunner implements CommandLineRunner {
 
                 logData(pw, i, "S3_LargeFetch", "JPQL", duration, queryCount, prepCount);
             }
+            System.out.println("[Phase S4] Measuring Scenario 4 (Large Fetch - DTO)...");
+            cleanMemory();
+            for (int i = 0; i < MEASURE_CYCLES; i++) {
+                Long randomId = getRandomCustomerId();
+
+                Statistics statistics = hibernateStatistics();
+                if (statistics != null) statistics.clear();
+
+                long start = System.nanoTime();
+                debtRepo.getHistoryJPQLDTO(randomId, PageRequest.of(0, 5000));
+                long duration = System.nanoTime() - start;
+
+                long queryCount = statistics != null ? statistics.getQueryExecutionCount() : -1;
+                long prepCount = statistics != null ? statistics.getPrepareStatementCount() : -1;
+
+                logData(pw, i, "S4_DTO", "JPQL", duration, queryCount, prepCount);
+            }
+            System.out.println("[S4] Measuring Scenario 4 (DTO 5000 rows) - NATIVE...");
+            cleanMemory();
+
+            for (int i = 0; i < MEASURE_CYCLES; i++) {
+                Long randomId = getRandomCustomerId();
+
+                Statistics statistics = hibernateStatistics();
+                if (statistics != null) statistics.clear();
+
+                long start = System.nanoTime();
+                debtRepo.getHistoryNativeDTO(randomId);
+                long duration = System.nanoTime() - start;
+
+                long queryCount = statistics != null ? statistics.getQueryExecutionCount() : -1;
+                long prepCount = statistics != null ? statistics.getPrepareStatementCount() : -1;
+
+                logData(pw, i, "S4_DTO", "Native", duration, queryCount, prepCount);
+            }
 
             System.out.println(">>> BENCHMARK COMPLETE. SUCCESS! <<<");
 
@@ -201,17 +237,17 @@ public class DebtBenchmarkRunner implements CommandLineRunner {
     // --- Helper Methods ---
 
     private Long getRandomCustomerId() {
-        // Random từ 1 đến MAX_CUSTOMER_ID (Giả sử FakeData tạo id liên tục)
+        // Random from 1 to MAX_CUSTOMER_ID
         return 1L + random.nextInt(MAX_CUSTOMER_ID);
     }
 
     private Long getRandomDebtId() {
-        // Random từ 1 đến MAX_DEBT_ID
+        //Random from 1 to MAX_DEBT_ID
         return 1L + (long) (random.nextDouble() * MAX_DEBT_ID);
     }
 
     private void logData(PrintWriter pw, int iteration, String scenario, String type, long durationNs, long queryCount, long prepCount) {
-        // Ghi dòng CSV: iteration, scenario, type, ns, ms, queries, prepared
+
         pw.printf("%d,%s,%s,%d,%.4f,%d,%d%n",
                 iteration,
                 scenario,
@@ -224,11 +260,9 @@ public class DebtBenchmarkRunner implements CommandLineRunner {
     }
 
     private void cleanMemory() {
-        // Bắt buộc gọi GC trước mỗi Phase lớn để đảm bảo công bằng về RAM
-        // Đặc biệt quan trọng với Scenario 3 (JPQL load rất nhiều object vào RAM)
-        System.gc();
+
         try {
-            Thread.sleep(1000); // Nghỉ 1s để GC kịp dọn dẹp
+            Thread.sleep(1000);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }
@@ -238,11 +272,11 @@ public class DebtBenchmarkRunner implements CommandLineRunner {
         try {
             SessionFactory sessionFactory = entityManagerFactory.unwrap(SessionFactory.class);
             Statistics statistics = sessionFactory.getStatistics();
-            // Bật thống kê nếu chưa bật (có chi phí hiệu năng nhưng cần cho benchmark)
+
             if (!statistics.isStatisticsEnabled()) statistics.setStatisticsEnabled(true);
             return statistics;
         } catch (Exception e) {
-            // Nếu không unwrap được (ví dụ không phải Hibernate) thì trả về null và chúng ta log -1
+
             return null;
         }
     }
